@@ -1,6 +1,7 @@
 #include <iostream>
 #include <vector>
 #include <algorithm>
+#include <unordered_set>
 #include <queue>
 #include <tuple>
 using namespace std;
@@ -96,7 +97,7 @@ void getUserInput() {
   }
 }
 
-// TC: n(log n)
+// TC: n (log n)
 int getProcessToExecute(int currentTime, vector<Process>& processes, vector<bool>& completed) {
   // Filtering for elligible processs
   // Processes which have arrived at the current instant and are not completed 
@@ -111,6 +112,7 @@ int getProcessToExecute(int currentTime, vector<Process>& processes, vector<bool
   return (elligibleProcesses.size() > 0) ? get<2>(elligibleProcesses.top()) : -1;
 }
 
+// TC : n * (n log n)
 vector<int> priorityScheduling() {
   int currentTime = 0;
   int completedProcesses = 0;
@@ -118,8 +120,14 @@ vector<int> priorityScheduling() {
   vector<bool> completed(totalProcesses, false);
   vector<int> executionSequence;
 
+  unordered_set<int> firstResponse;
+
   while(completedProcesses < totalProcesses) {
     int pid = getProcessToExecute(currentTime, processes, completed);
+    if (firstResponse.count(pid) == 0) {
+      processes[pid].setResponseTime(currentTime - processes[pid].getArrivalTime());
+      firstResponse.insert(pid);
+    }
     executionSequence.push_back(pid);
     currentTime++;
     if (pid != -1) {
@@ -135,11 +143,54 @@ vector<int> priorityScheduling() {
   return executionSequence;
 }
 
-int main() {
-  getUserInput();
-  vector<int> ganttChart = priorityScheduling();
+tuple<double, double, double> calculateStats() {
+  int n = processes.size();
+  double tatAvg = 0, wtAvg = 0, rtAvg = 0;
+  // Calculation of TAT = CT - AT, WT = TAT - BT
+  for (auto& process : processes) {
+    process.setTurnAroundTime(process.getCompletionTime() - process.getArrivalTime());
+    tatAvg += process.getTurnAroundTime();
+    process.setWaitTime(process.getTurnAroundTime() - process.getBurstTime());
+    wtAvg += process.getWaitTime();
+    rtAvg += process.getResponseTime();
+  } 
+  tatAvg /= n;
+  wtAvg /= n;
+  rtAvg /= n;
+
+  return make_tuple(tatAvg, wtAvg, rtAvg);
+}
+
+void printStats(vector<int>& ganttChart, tuple<int, int, int>& stats) {
+  cout << "\n<--- STATISTICS --->\n";
+  cout << "Gantt Chart : ";
   for (int i: ganttChart) {
     cout << i << " ";
   }
+  cout << endl;
+
+  // Creating tabular format
+  cout << "Pid\tPty\tAT\tBT\tCT\tTAT\tWT\tRT\t" << endl;
+  for (const auto& process: processes) {
+    cout << process.getPid() << "\t";
+    cout << process.getPriority() << "\t";
+    cout << process.getArrivalTime() << "\t";
+    cout << process.getBurstTime() << "\t";
+    cout << process.getCompletionTime() << "\t";
+    cout << process.getTurnAroundTime() << "\t";
+    cout << process.getWaitTime() << "\t";
+    cout << process.getResponseTime() << "\t\n";
+  }
+
+  cout << "Turn Around Time Average: " << get<0>(stats) << endl;
+  cout << "Wait Time Average       : " << get<1>(stats) << endl;
+  cout << "Response Time Average   : " << get<2>(stats) << endl;
+}
+
+int main() {
+  getUserInput();
+  vector<int> ganttChart = priorityScheduling();
+  tuple<int, int, int> stats = calculateStats();
+  printStats(ganttChart, stats);
   return 0;
 }
