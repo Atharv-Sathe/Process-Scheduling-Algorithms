@@ -6,7 +6,6 @@
 #include <tuple>
 using namespace std;
 
-
 class Process {
   private:
   int pid; 
@@ -18,10 +17,11 @@ class Process {
   int waitTime;
   int responseTime;
   int remainingTime;
+  int waitCount;
   
   public:
-  Process(int pid, int arrT, int bT, int pty): pid(pid), arrivalTime(arrT), burstTime(bT), priority(pty), remainingTime(bT) {}
-  Process(int pid, int arrT, int bT): pid(pid), arrivalTime(arrT), burstTime(bT), remainingTime(bT) {}
+  Process(int pid, int arrT, int bT, int pty): pid(pid), arrivalTime(arrT), burstTime(bT), priority(pty), remainingTime(bT), waitCount(0) {}
+  Process(int pid, int arrT, int bT): pid(pid), arrivalTime(arrT), burstTime(bT), remainingTime(bT), waitCount(0) {}
   
   int getPid() const {return pid;}
   int getArrivalTime() const {return arrivalTime;}
@@ -32,6 +32,7 @@ class Process {
   int getWaitTime() const {return waitTime;}
   int getRemainingTime() const {return remainingTime;}
   int getResponseTime() const {return responseTime;}
+  int getWaitCount() const {return waitCount;}
   
   void setPid(int val) {pid = val;}
   void setArrivalTime(int val) {arrivalTime = val;}
@@ -42,6 +43,7 @@ class Process {
   void setWaitTime(int val) {waitTime = val;}
   void setRemainingTime(int val) {remainingTime = val;}
   void setResponseTime(int val) {responseTime = val;}
+  void setWaitCount(int val) {waitCount = val;}
   
 };
 
@@ -49,6 +51,8 @@ class Process {
 
 // Global Processes Vector
 vector<Process> processes;
+// Global Variable to Store wheather to Implement Aging or not
+int agingThreshold;
 
 void assignPrioritiesBasedOnBT() {
   // Higest Burst Time Gets Least Priority
@@ -76,6 +80,8 @@ void getUserInput() {
   cout << "Enter choice (1 or 2): ";
   int choice;
   cin >> choice;
+  cout << "Set Aging Threshold or (-1): ";
+  cin >> agingThreshold;
 
   if (choice == 1) {
     cout << "Enter " << pNum << " process details ('Arrival Time' 'Burst Time'):\n";
@@ -109,7 +115,29 @@ int getProcessToExecute(int currentTime, vector<Process>& processes, vector<bool
       elligibleProcesses.push({process.getPriority(), process.getArrivalTime(), process.getPid()});
     } 
   }
-  return (elligibleProcesses.size() > 0) ? get<2>(elligibleProcesses.top()) : -1;
+
+  int pidSelect = (elligibleProcesses.size() > 0) ? get<2>(elligibleProcesses.top()) : -1;
+
+  if (agingThreshold != -1) {
+    priority_queue<tuple<int, int, int>, vector<tuple<int, int, int>>, greater<tuple<int, int, int>>> ready = elligibleProcesses;
+
+    // Implement Aging
+    while(ready.size() > 0) {
+      tuple<int, int, int> p = ready.top();
+      ready.pop();
+      int pidNotSelect = get<2>(p);
+      if (pidNotSelect != pidSelect) {
+        processes[pidNotSelect].setWaitCount(processes[pidNotSelect].getWaitCount() + 1);
+        // The Priority can't go beyond 0
+        if (get<0>(p) > 0 && (processes[pidNotSelect].getWaitCount() >= agingThreshold)) {
+          processes[pidNotSelect].setPriority(get<0>(p) - 1);
+        }
+      }
+
+    }
+  }
+
+  return pidSelect;
 }
 
 // TC : n * (n log n)
@@ -161,7 +189,7 @@ tuple<double, double, double> calculateStats() {
   return make_tuple(tatAvg, wtAvg, rtAvg);
 }
 
-void printStats(vector<int>& ganttChart, tuple<int, int, int>& stats) {
+void printStats(vector<int>& ganttChart, tuple<double, double, double>& stats) {
   cout << "\n<--- STATISTICS --->\n";
   cout << "Gantt Chart : ";
   for (int i: ganttChart) {
@@ -190,7 +218,7 @@ void printStats(vector<int>& ganttChart, tuple<int, int, int>& stats) {
 int main() {
   getUserInput();
   vector<int> ganttChart = priorityScheduling();
-  tuple<int, int, int> stats = calculateStats();
+  tuple<double, double, double> stats = calculateStats();
   printStats(ganttChart, stats);
   return 0;
 }
