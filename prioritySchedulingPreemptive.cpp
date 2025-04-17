@@ -132,6 +132,9 @@ int getProcessToExecute(int currentTime, vector<Process>& processes, vector<bool
         if (get<0>(p) > 0 && (processes[pidNotSelect].getWaitCount() >= agingThreshold)) {
           processes[pidNotSelect].setPriority(get<0>(p) - 1);
         }
+      } else {
+        // Resent the wait count if a process gets selected.
+        processes[pidNotSelect].setWaitCount(0);
       }
 
     }
